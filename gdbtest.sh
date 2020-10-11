@@ -4,7 +4,7 @@ make clean;
 clear;
 make;
 echo "-----------"
-./multi-lookup 1 1 serviced.txt results.txt
+gdb --args multi-lookup 1 1 serviced.txt results.txt
 
 #if test -x "multi-lookup"; then
 #	./multi-lookup 5 5 req_log.txt res_log.txt
