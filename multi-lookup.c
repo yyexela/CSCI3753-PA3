@@ -13,6 +13,10 @@ int main(int argc, char * argv[]){
 	void * buffer = malloc(MAX_NAME_LENGTH * ARR_SIZE);
 	res_params_t res_params;
 	req_params_t req_params;
+	int out = 0; // producer
+	int in = 0; // consumer
+	int count = 0; // # in buffer
+	int index = 6; // position of next file input
 
 	// CHECK COMMAND LINE ARGUMENTS
 	if(check_args(argc, argv)) return -1;
@@ -24,7 +28,7 @@ int main(int argc, char * argv[]){
 	if(open_log(&req_log, (char *) (argv[3])) != 0 || open_log(&res_log, (char *) (argv[4])) != 0) return -1;
 
 	// CREATE ARGS FOR THREAD POOLS
-	if(create_res_params(&res_params, argv, res_log, buffer) || create_req_params(&req_params, req_log, buffer)) return -1;
+	if(create_req_params(&req_params, argv, req_log, buffer, &index, &count, &out) || create_res_params(&res_params, res_log, buffer, &count, &in)) return -1;
 
 	// CREATE POOLS
 	pthread_t req_pool[req_num];
@@ -41,30 +45,34 @@ int main(int argc, char * argv[]){
 }
 
 void * res_func(void * ptr){
-	// printf("res_func: Thread %lu\n", pthread_self());
 	// Cast parameters
 	res_params_t * res_params = (res_params_t *) ptr;
-	printf("res_func: Thread %lu, FILE * %p, buffer * %p\n", pthread_self(), res_params->log_file, res_params->buffer);
+	printf("res: %d\n", *(res_params->count));
 	return 0;
 }
 
 void * req_func(void * ptr){
 	// Cast parameters
 	req_params_t * req_params = (req_params_t *) ptr;
-	printf("req_func: Thread %lu, FILE * %p, buffer * %p\n", pthread_self(), req_params->log_file, req_params->buffer);
+	printf("req: %d\n", *(req_params->count));
 	return 0;
 }
 
-int create_res_params(res_params_t * res_params, char ** argv, FILE * log_file, void * buffer){
-	res_params->argv = argv;
-	res_params->log_file = log_file;
-	res_params->buffer = buffer;
-	return 0;
-}
-
-int create_req_params(req_params_t * req_params, FILE * log_file, void * buffer){
+int create_req_params(req_params_t * req_params, char ** argv, FILE * log_file, void * buffer, int * index, int * count, int * out){
 	req_params->log_file = log_file;
 	req_params->buffer = buffer;
+	req_params->argv = argv;
+	req_params->index = index;
+	req_params->count = count;
+	req_params->out = out;
+	return 0;
+}
+
+int create_res_params(res_params_t * res_params, FILE * log_file, void * buffer, int * count, int * in){
+	res_params->log_file = log_file;
+	res_params->buffer = buffer;
+	res_params->count = count;
+	res_params->in = in;
 	return 0;
 }
 
@@ -88,11 +96,11 @@ int get_res_req_num(long * res_num, long * req_num, char * argv[]){
 }
 
 int check_args(int argc, char * argv[]){
-	// CHECK FOR ARGUMENT COUNT >= 5
+	// CHECK FOR ARGUMENT COUNT >= 6
 
-	if(argc < 5){
+	if(argc < 6){
 		printf("Please enter the command as follows:\n");
-		printf("multi-lookup <# requester> <# resolver> <requester log> <resolver log> [ <data file> ...]\n");
+		printf("multi-lookup <# requester> <# resolver> <requester log> <resolver log> <data file> [ <data file> ...]\n");
 		return -1;
 	}
 

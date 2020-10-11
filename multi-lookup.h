@@ -13,16 +13,21 @@
 #define DEBUG_PRINT 1
 #define ARR_SIZE 10
 
-typedef struct res_params_s{
-	FILE * log_file;
-	void * buffer;
-	char ** argv;
-} res_params_t;
-
 typedef struct req_params_s{
 	FILE * log_file;
 	void * buffer;
+	char ** argv;
+	int * index;
+	int * count;
+	int * out;
 } req_params_t;
+
+typedef struct res_params_s{
+	FILE * log_file;
+	void * buffer;
+	int * count;
+	int * in;
+} res_params_t;
 
 void * req_func(void * ptr);
 void * res_func(void * ptr);
@@ -31,8 +36,8 @@ int join_pool(int num, pthread_t * arr);
 int open_log(FILE ** log, char * file_name);
 int check_args(int argc, char * argv[]);
 int get_res_req_num(long * res_num, long * req_num, char * argv[]);
-int create_res_params(res_params_t * res_params, char ** argv, FILE * log_file, void * buffer);
-int create_req_params(req_params_t * res_params, FILE * log_file, void * buffer);
+int create_req_params(req_params_t * res_params, char ** argv, FILE * log_file, void * buffer, int * index, int * count, int * out);
+int create_res_params(res_params_t * res_params, FILE * log_file, void * buffer, int * count, int * in);
 
 #endif
 
