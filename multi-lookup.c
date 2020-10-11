@@ -9,7 +9,8 @@ int main(int argc, char * argv[]){
 	FILE * req_log = NULL;
 	FILE * res_log = NULL;
 	long req_num, res_num;
-	// pthread_t * req_pool, res_pool; // DEFINE LATER
+	// pthread_t * req_pool, res_pool; // DEFINED LATER
+	void * buffer = malloc(MAX_NAME_LENGTH * ARR_SIZE);
 
 	// CHECK COMMAND LINE ARGUMENTS
 
@@ -24,17 +25,29 @@ int main(int argc, char * argv[]){
 
 	if(open_log(req_log, (char *) (argv[3])) != 0 || open_log(res_log, (char *) (argv[4])) != 0) return -1;
 
-	// CREATE THREAD POOLS
+	// CREATE POOLS
 
 	pthread_t req_pool[req_num];
 	pthread_t res_pool[res_num];
-	if(create_pool(req_num, (pthread_t *) (req_pool)) || create_pool(res_num, (pthread_t * ) (res_pool))) return -1;
+	if(create_pool(req_num, (pthread_t *) (req_pool), req_func) || create_pool(res_num, (pthread_t * ) (res_pool), res_func)) return -1;
 
-	// JOIN REQUESTER THREAD POOLS
+	// JOIN THREAD POOLS
 
 	if(join_pool(req_num, (pthread_t *) (req_pool)) || join_pool(res_num, (pthread_t *) (res_pool))) return -1;
 
+	// FREE MEMORY
+	free(buffer);
 
+}
+
+void * req_func(void * ptr){
+	printf("req_func: Thread %lu\n", pthread_self());
+	return 0;
+}
+
+void * res_func(void * ptr){
+	printf("res_func: Thread %lu\n", pthread_self());
+	return 0;
 }
 
 int get_res_req_num(long * res_num, long * req_num, char * argv[]){
@@ -75,9 +88,9 @@ int check_args(int argc, char * argv[]){
 	return 0;
 }
 
-int create_pool(int num, pthread_t * arr){
+int create_pool(int num, pthread_t * arr, void * func){
 	for(int i = 0; i < num; i++){
-		if(pthread_create(&(arr[i]), NULL, req_func, NULL)){
+		if(pthread_create(&(arr[i]), NULL, func, NULL)){
 			printf("create_pool: Failed to create thread %d\n", i);
 			return -1;
 		}
@@ -106,10 +119,4 @@ int open_log(FILE * log, char * file_name){
 
 	return 0;
 }
-
-void * req_func(void * ptr){
-	printf("req_func: Thread %lu\n", pthread_self());
-	return 0;
-}
-
 
