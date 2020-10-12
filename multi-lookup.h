@@ -65,7 +65,7 @@ int open_log(FILE ** log, char * file_name);
 int check_args(int argc, char * argv[]);
 int get_req_res_num(long * req_num, long * res_num, char * argv[]);
 int get_next_file(FILE ** input_file, req_params_t * req_params);
-int read_line(char * line, FILE * input_file, req_params_t * req_params);
+int read_line(char * line, FILE * input_file);
 void add_to_buffer(char * line, req_params_t * req_params);
 int remove_from_buffer(char * line, res_params_t * res_params);
 void add_to_req_log(char * line, req_params_t * req_params);

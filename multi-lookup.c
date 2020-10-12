@@ -141,7 +141,7 @@ int main(int argc, char * argv[]){
 		return -1;
 	}
 	
-	printf("./multi-lookup ran for %ld.%ld seconds\n", time_end.tv_sec - time_start.tv_sec, time_end.tv_usec - time_start.tv_usec);
+	printf("./multi-lookup ran for %f seconds\n", (double) (((time_end.tv_sec * 1000000 + time_end.tv_usec) - (time_start.tv_sec * 1000000 + time_start.tv_usec))/1000000.0));
 
 	return 0;
 }
@@ -180,7 +180,7 @@ void * req_func(void * ptr){
 			// FILE EXISTS AND OPENED
 
 			// Produce lines from the input file
-			while(read_line((char *) line, input_file, req_params) == 0){
+			while(read_line((char *) line, input_file) == 0){
 				if(DEBUG_PRINT && DEBUG_PRINT_LOGS_STDOUT) printf("Thread %lu reads %s\n", pthread_self(), line);
 				// Put lines into the buffer
 				add_to_buffer((char *) line, req_params);
@@ -288,7 +288,7 @@ int remove_from_buffer(char * line, res_params_t * res_params){
 }
 
 // Returns 0 on successful line, 1 otherwise
-int read_line(char * line, FILE * input_file, req_params_t * req_params){
+int read_line(char * line, FILE * input_file){
 	if(fgets(line, MAX_NAME_LENGTH, input_file) != NULL){
 		long bytes = strlen(line);
 		if(bytes != 0){
