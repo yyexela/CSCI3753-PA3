@@ -62,8 +62,6 @@ int join_pool(int num, pthread_t * arr);
 int open_log(FILE ** log, char * file_name);
 int check_args(int argc, char * argv[]);
 int get_req_res_num(long * req_num, long * res_num, char * argv[]);
-int create_req_params(req_params_t * res_params, char ** argv, FILE * log_file, void * buffer, int * index, int * count, int * in, int * argc, pthread_mutex_t * mutex_index, pthread_mutex_t * mutex_count, pthread_mutex_t * mutex_buffer, pthread_mutex_t * mutex_done, pthread_mutex_t * req_log, pthread_cond_t * cond_req, pthread_cond_t * cond_res, int * done);
-int create_res_params(res_params_t * res_params, FILE * log_file, void * buffer, int * count, int * out, pthread_mutex_t * mutex_count, pthread_mutex_t * mutex_buffer, pthread_mutex_t * mutex_done, pthread_mutex_t * res_log, pthread_cond_t * cond_req, pthread_cond_t * cond_res, int * done);
 int get_next_file(FILE ** input_file, req_params_t * req_params);
 int read_line(char * line, FILE * input_file, req_params_t * req_params);
 void add_to_buffer(char * line, req_params_t * req_params);

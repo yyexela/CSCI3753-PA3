@@ -57,7 +57,35 @@ int main(int argc, char * argv[]){
 	if(open_log(&req_log, (char *) (argv[3])) != 0 || open_log(&res_log, (char *) (argv[4])) != 0) return -1;
 
 	// CREATE ARGS FOR THREAD POOLS
-	if(create_req_params(&req_params, argv, req_log, buffer, &index, &count, &in, &argc, &mutex_index, &mutex_count, &mutex_buffer, &mutex_done, &mutex_req_log, &cond_req, &cond_res, &done) || create_res_params(&res_params, res_log, buffer, &count, &out, &mutex_count, &mutex_buffer, &mutex_done, &mutex_res_log, &cond_req, &cond_res, &done)) return 0;
+	// if(create_req_params(&req_params, argv, req_log, buffer, &index, &count, &in, &argc, &mutex_index, &mutex_count, &mutex_buffer, &mutex_done, &mutex_req_log, &cond_req, &cond_res, &done) || create_res_params(&res_params, res_log, buffer, &count, &out, &mutex_count, &mutex_buffer, &mutex_done, &mutex_res_log, &cond_req, &cond_res, &done)) return 0;
+
+	req_params.log_file = req_log;
+	req_params.buffer = buffer;
+	req_params.argv = argv;
+	req_params.index = &index;
+	req_params.count = &count;
+	req_params.in = &in;
+	req_params.argc = &argc;
+	req_params.mutex_index = &mutex_index;
+	req_params.mutex_count = &mutex_count;
+	req_params.mutex_buffer = &mutex_buffer;
+	req_params.mutex_done = &mutex_done;
+	req_params.mutex_req_log = &mutex_req_log;
+	req_params.cond_req = &cond_req;
+	req_params.cond_res = &cond_res;
+	req_params.done = &done;
+
+	res_params.log_file = res_log;
+	res_params.buffer = buffer;
+	res_params.count = &count;
+	res_params.out = &out;
+	res_params.mutex_count = &mutex_count;
+	res_params.mutex_buffer = &mutex_buffer;
+	res_params.mutex_done = &mutex_done;
+	res_params.mutex_res_log = &mutex_res_log;
+	res_params.cond_res = &cond_res;
+	res_params.cond_req = &cond_req;
+	res_params.done = &done;
 
 	// CREATE POOLS
 	pthread_t req_pool[req_num];
@@ -241,40 +269,6 @@ int get_next_file(FILE ** input_file, req_params_t * req_params){
 		if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("get_next_file: Thread %lu opened %s\n", pthread_self(), req_params->argv[*(req_params->index)]);
 		*(req_params->index) = (*(req_params->index)) + 1;
 	pthread_mutex_unlock(req_params->mutex_index);
-	return 0;
-}
-
-int create_req_params(req_params_t * req_params, char ** argv, FILE * log_file, void * buffer, int * index, int * count, int * in, int * argc, pthread_mutex_t * mutex_index, pthread_mutex_t * mutex_count, pthread_mutex_t * mutex_buffer, pthread_mutex_t * mutex_done, pthread_mutex_t * mutex_req_log, pthread_cond_t * cond_req, pthread_cond_t * cond_res, int * done){
-	req_params->log_file = log_file;
-	req_params->buffer = buffer;
-	req_params->argv = argv;
-	req_params->index = index;
-	req_params->count = count;
-	req_params->in = in;
-	req_params->argc = argc;
-	req_params->mutex_index = mutex_index;
-	req_params->mutex_count = mutex_count;
-	req_params->mutex_buffer = mutex_buffer;
-	req_params->mutex_done = mutex_done;
-	req_params->mutex_req_log = mutex_req_log;
-	req_params->cond_req = cond_req;
-	req_params->cond_res = cond_res;
-	req_params->done = done;
-	return 0;
-}
-
-int create_res_params(res_params_t * res_params, FILE * log_file, void * buffer, int * count, int * out, pthread_mutex_t * mutex_count, pthread_mutex_t * mutex_buffer, pthread_mutex_t * mutex_done, pthread_mutex_t * mutex_res_log, pthread_cond_t * cond_req, pthread_cond_t * cond_res, int * done){
-	res_params->log_file = log_file;
-	res_params->buffer = buffer;
-	res_params->count = count;
-	res_params->out = out;
-	res_params->mutex_count = mutex_count;
-	res_params->mutex_buffer = mutex_buffer;
-	res_params->mutex_done = mutex_done;
-	res_params->mutex_res_log = mutex_res_log;
-	res_params->cond_res = cond_res;
-	res_params->cond_req = cond_req;
-	res_params->done = done;
 	return 0;
 }
 
