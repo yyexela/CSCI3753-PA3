@@ -4,7 +4,8 @@ make clean;
 clear;
 make;
 echo "-----------"
-gdb --args multi-lookup 3 2 serviced.txt results.txt "input/names1.txt" "input/names2.txt" "input/names3.txt" "input/names4.txt"
+gdb --args multi-lookup 5 5 serviced.txt results.txt "input/names1.txt" "input/names2.txt" "input/names3.txt" "input/names4.txt" "input/names5.txt" "input/names6.txt"
+#gdb --args multi-lookup 1 1 serviced.txt results.txt "input/names1.txt" 
 
 
 

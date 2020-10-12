@@ -11,7 +11,10 @@ int main(int argc, char * argv[]){
 	FILE * res_log = NULL;
 	long req_num, res_num;
 	// pthread_t * req_pool, res_pool; // DEFINED LATER
-	void * buffer = malloc(MAX_NAME_LENGTH * ARR_SIZE);
+	void * buffer = malloc(MAX_NAME_LENGTH * ARR_SIZE * sizeof(char));
+
+	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Malloc: buffer %p size %lu\n", buffer, MAX_NAME_LENGTH * ARR_SIZE * sizeof(char));
+
 	res_params_t res_params;
 	req_params_t req_params;
 	int out = 0; // producer
@@ -27,10 +30,14 @@ int main(int argc, char * argv[]){
 	pthread_mutex_t mutex_count;
 	pthread_mutex_t mutex_buffer;
 	pthread_mutex_t mutex_done;
+	pthread_mutex_t mutex_req_log;
+	pthread_mutex_t mutex_res_log;
 	pthread_mutex_init(&mutex_index, NULL);
 	pthread_mutex_init(&mutex_count, NULL);
 	pthread_mutex_init(&mutex_buffer, NULL);
 	pthread_mutex_init(&mutex_done, NULL);
+	pthread_mutex_init(&mutex_req_log, NULL);
+	pthread_mutex_init(&mutex_res_log, NULL);
 
 	// CONDITIONAL VARIABLES
 	// TODO Wrap in case of error
@@ -50,7 +57,7 @@ int main(int argc, char * argv[]){
 	if(open_log(&req_log, (char *) (argv[3])) != 0 || open_log(&res_log, (char *) (argv[4])) != 0) return -1;
 
 	// CREATE ARGS FOR THREAD POOLS
-	if(create_req_params(&req_params, argv, req_log, buffer, &index, &count, &in, &argc, &mutex_index, &mutex_count, &mutex_buffer, &mutex_done, &cond_req, &cond_res, &done) || create_res_params(&res_params, res_log, buffer, &count, &out, &mutex_count, &mutex_buffer, &mutex_done, &cond_req, &cond_res, &done)) return 0;
+	if(create_req_params(&req_params, argv, req_log, buffer, &index, &count, &in, &argc, &mutex_index, &mutex_count, &mutex_buffer, &mutex_done, &mutex_req_log, &cond_req, &cond_res, &done) || create_res_params(&res_params, res_log, buffer, &count, &out, &mutex_count, &mutex_buffer, &mutex_done, &mutex_res_log, &cond_req, &cond_res, &done)) return 0;
 
 	// CREATE POOLS
 	pthread_t req_pool[req_num];
@@ -62,18 +69,36 @@ int main(int argc, char * argv[]){
 	if(join_pool(req_num, (pthread_t *) (req_pool))) return -1;
 
 	// INFORM CONSUMERS TO EXIT
-	pthread_mutex_lock(&mutex_done);
-		done = 1;
-		pthread_cond_broadcast(&cond_res);
-	pthread_mutex_unlock(&mutex_done);
+	pthread_mutex_lock(&mutex_buffer);
+			pthread_mutex_lock(&mutex_done);
+				done = 1;
+				pthread_cond_broadcast(&cond_res);
+			pthread_mutex_unlock(&mutex_done);
+	pthread_mutex_unlock(&mutex_buffer);
 
 	// JOIN CONSUMER THREAD POOL
 	if(join_pool(res_num, (pthread_t *) (res_pool))) return -1;
 
-	// FREE MEMORY
+	// FREE MEMORY FROM BUFFER
 	free(buffer);
 
-	if(DEBUG_PRINT) printf("Successfully finished\n");
+	// FREE MUTEXES AND COND VARS
+	pthread_mutex_destroy(&mutex_index);
+	pthread_mutex_destroy(&mutex_count);
+	pthread_mutex_destroy(&mutex_buffer);
+	pthread_mutex_destroy(&mutex_done);
+	pthread_mutex_destroy(&mutex_req_log);
+	pthread_mutex_destroy(&mutex_res_log);
+	pthread_cond_destroy(&cond_req);
+	pthread_cond_destroy(&cond_res);
+
+	// CLOSE FILES
+	fclose(res_log);
+	fclose(req_log);
+
+	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Free: buffer %p\n", buffer);
+
+	if(DEBUG_PRINT && DEBUG_PRINT_DONE) printf("Successfully finished\n");
 
 	return 0;
 }
@@ -84,67 +109,95 @@ void * req_func(void * ptr){
 
 	// Create thread-specific variables
 	FILE * input_file = NULL;
+	char * line = (char *) malloc(sizeof(char) * MAX_NAME_LENGTH);
+	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Malloc: req line %p of size %lu\n", line, sizeof(char) * MAX_NAME_LENGTH);
 
 	// Main producer loop
 	while(1){
 		// Get a file
-		if(get_next_file(&input_file, req_params)) return 0;
+		if(get_next_file(&input_file, req_params)){
+			// Free and exit when no more files
+			free(line);
+			if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Free: req line %p\n", line);
+			return 0;
+		}
 		
-		// Produce lines from the file into the buffer
-		read_line(input_file, req_params);
+		// Produce lines from the input file
+		while(read_line((char *) line, input_file, req_params) == 0){
+				// Put lines into the buffer
+				add_to_buffer((char *) line, req_params);
+		}
+
+		// Close opened file
+		if(input_file != NULL){
+			if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("Thread %lu closed a file\n", pthread_self());
+			fclose(input_file);
+		}
 	}	
+	printf("SHOULD NEVER BE HERE\n");
+	free(line);
+	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Free: req line %p\n", line);
 	return 0;
 }
 
 void * res_func(void * ptr){
 	// Cast parameters to struct
 	res_params_t * res_params = (res_params_t *) ptr;
+	char * line = (char *) malloc(sizeof(char) * MAX_NAME_LENGTH);
+	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Malloc: req line %p of size %lu\n", line, sizeof(char) * MAX_NAME_LENGTH);
 
 	// Main consumer loop
-	while(remove_from_buffer(res_params)){
+	while(1){
+		if(remove_from_buffer((char *) line, res_params)){
+			// Free and exit when no more producers
+			free(line);
+			if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Free: res line %p\n", line);
+			return 0;
+		}
+		if(DEBUG_PRINT && DEBUG_PRINT_REMOVE) printf("Consumer read %s\n", line);
 	}
 
-	// Create thread-specific variables
+	printf("SHOULD NEVER BE HERE\n");
+	free(line);
+	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Free: res line %p\n", line);
 	return 0;
 }
 
-// return 0 only when done, return 1 when read item
-int remove_from_buffer(res_params_t * res_params){
-	char line[MAX_NAME_LENGTH];
+// return 1 only when done, return 0 when read item
+int remove_from_buffer(char * line, res_params_t * res_params){
 	pthread_mutex_lock(res_params->mutex_count);
 		while(*(res_params->count) <= 0){
 			pthread_mutex_lock(res_params->mutex_done);
 				if(*(res_params->done)){
 					pthread_mutex_unlock(res_params->mutex_done);
 					pthread_mutex_unlock(res_params->mutex_count);
-					return 0;
+					return 1;
 				}
 			pthread_mutex_unlock(res_params->mutex_done);
 			pthread_cond_wait(res_params->cond_res, res_params->mutex_count);
 		}
 		pthread_mutex_lock(res_params->mutex_buffer);
-			strcpy(line, res_params->buffer + (MAX_NAME_LENGTH * (*(res_params->out))));
-			*(res_params->out) = (*(res_params->out)) + 1 % ARR_SIZE;
+			if(DEBUG_PRINT && DEBUG_PRINT_ADD) printf("Copying str from buffer at index %d offset %d\n", *(res_params->out), MAX_NAME_LENGTH * (*(res_params->out)));
+			strncpy(line, res_params->buffer + (MAX_NAME_LENGTH * (*(res_params->out))), MAX_NAME_LENGTH);
+			*(res_params->out) = (*res_params->out + 1) % ARR_SIZE;
 			*(res_params->count) = (*(res_params->count)) - 1;
 			if(DEBUG_PRINT && DEBUG_PRINT_REMOVE && DEBUG_PRINT_COUNT) printf("Count: %d\n", *(res_params->count));
 		pthread_mutex_unlock(res_params->mutex_buffer);
 	pthread_mutex_unlock(res_params->mutex_count);
 	pthread_cond_signal(res_params->cond_req);
 
-	if(DEBUG_PRINT && DEBUG_PRINT_REMOVE) printf("Consumer read %s\n", line);
-	return 1;
+	return 0;
 }
 
-void read_line(FILE * input_file, req_params_t * req_params){
-	char line[MAX_NAME_LENGTH];
+// Returns 0 on successful line, 1 otherwise
+int read_line(char * line, FILE * input_file, req_params_t * req_params){
 	//char ip_addr[MAX_IP_LENGTH];
-	while(fgets(line, MAX_NAME_LENGTH, input_file) != NULL){
-		// TODO: See if newline is ok to remove
+	if(fgets(line, MAX_NAME_LENGTH, input_file) != NULL){
 		long bytes = strlen(line);
 		if(bytes != 0){
 			line[bytes-1] = '\0';
 		}
-		add_to_buffer((char *) line, req_params);
+		return 0;
 		/*if(dnslookup(line, ip_addr, MAX_IP_LENGTH)){
 			if(DEBUG_PRINT && DEBUG_PRINT_DNS) printf("DNS for %s failed\n", line);
 			ip_addr[0] = '\0';
@@ -152,6 +205,7 @@ void read_line(FILE * input_file, req_params_t * req_params){
 		if(DEBUG_PRINT && DEBUG_PRINT_DNS) printf("Thread %lu reads %s as %s\n", pthread_self(), line, ip_addr);
 		*/
 	}
+	return 1;
 }
 
 void add_to_buffer(char * line, req_params_t * req_params){
@@ -160,8 +214,9 @@ void add_to_buffer(char * line, req_params_t * req_params){
 			pthread_cond_wait(req_params->cond_req, req_params->mutex_count);
 		}
 		pthread_mutex_lock(req_params->mutex_buffer);
-			strcpy(req_params->buffer + (MAX_NAME_LENGTH * (*(req_params->in))), line);
-			*(req_params->in) = (*(req_params->in)) + 1 % ARR_SIZE;
+			if(DEBUG_PRINT && DEBUG_PRINT_ADD) printf("Copying str to buffer at index %d offset %d\n", *(req_params->in), MAX_NAME_LENGTH * (*(req_params->in)));
+			strncpy(req_params->buffer + (MAX_NAME_LENGTH * (*(req_params->in))), line, MAX_NAME_LENGTH);
+			*(req_params->in) = (*(req_params->in) + 1) % ARR_SIZE;
 			*(req_params->count) = (*(req_params->count)) + 1;
 			if(DEBUG_PRINT && DEBUG_PRINT_ADD)printf("Count: %d\n", *(req_params->count));
 		pthread_mutex_unlock(req_params->mutex_buffer);
@@ -189,7 +244,7 @@ int get_next_file(FILE ** input_file, req_params_t * req_params){
 	return 0;
 }
 
-int create_req_params(req_params_t * req_params, char ** argv, FILE * log_file, void * buffer, int * index, int * count, int * in, int * argc, pthread_mutex_t * mutex_index, pthread_mutex_t * mutex_count, pthread_mutex_t * mutex_buffer, pthread_mutex_t * mutex_done, pthread_cond_t * cond_req, pthread_cond_t * cond_res, int * done){
+int create_req_params(req_params_t * req_params, char ** argv, FILE * log_file, void * buffer, int * index, int * count, int * in, int * argc, pthread_mutex_t * mutex_index, pthread_mutex_t * mutex_count, pthread_mutex_t * mutex_buffer, pthread_mutex_t * mutex_done, pthread_mutex_t * mutex_req_log, pthread_cond_t * cond_req, pthread_cond_t * cond_res, int * done){
 	req_params->log_file = log_file;
 	req_params->buffer = buffer;
 	req_params->argv = argv;
@@ -201,13 +256,14 @@ int create_req_params(req_params_t * req_params, char ** argv, FILE * log_file, 
 	req_params->mutex_count = mutex_count;
 	req_params->mutex_buffer = mutex_buffer;
 	req_params->mutex_done = mutex_done;
+	req_params->mutex_req_log = mutex_req_log;
 	req_params->cond_req = cond_req;
 	req_params->cond_res = cond_res;
 	req_params->done = done;
 	return 0;
 }
 
-int create_res_params(res_params_t * res_params, FILE * log_file, void * buffer, int * count, int * out, pthread_mutex_t * mutex_count, pthread_mutex_t * mutex_buffer, pthread_mutex_t * mutex_done, pthread_cond_t * cond_req, pthread_cond_t * cond_res, int * done){
+int create_res_params(res_params_t * res_params, FILE * log_file, void * buffer, int * count, int * out, pthread_mutex_t * mutex_count, pthread_mutex_t * mutex_buffer, pthread_mutex_t * mutex_done, pthread_mutex_t * mutex_res_log, pthread_cond_t * cond_req, pthread_cond_t * cond_res, int * done){
 	res_params->log_file = log_file;
 	res_params->buffer = buffer;
 	res_params->count = count;
@@ -215,6 +271,7 @@ int create_res_params(res_params_t * res_params, FILE * log_file, void * buffer,
 	res_params->mutex_count = mutex_count;
 	res_params->mutex_buffer = mutex_buffer;
 	res_params->mutex_done = mutex_done;
+	res_params->mutex_res_log = mutex_res_log;
 	res_params->cond_res = cond_res;
 	res_params->cond_req = cond_req;
 	res_params->done = done;
@@ -228,14 +285,14 @@ int get_req_res_num(long * req_num, long * res_num, char * argv[]){
 		printf("Ensure 1 to %d requesters\n", MAX_REQUESTER_THREADS);
 		return -1;
 	}
-	if(DEBUG_PRINT) printf("Requesters: %ld\n", *(req_num));
+	if(DEBUG_PRINT && DEBUG_PRINT_POOLS) printf("Requesters: %ld\n", *(req_num));
 
 	*(res_num) = strtol(argv[2], &argv[3]-1,10);
 	if(*(res_num) < 0 || *(res_num) > MAX_RESOLVER_THREADS){
 		printf("Ensure 1 to %d resolvers\n", MAX_RESOLVER_THREADS);
 		return -1;
 	}
-	if(DEBUG_PRINT) printf("Resolvers: %ld\n", *(res_num));
+	if(DEBUG_PRINT && DEBUG_PRINT_POOLS) printf("Resolvers: %ld\n", *(res_num));
 
 	return 0;
 }
