@@ -22,8 +22,10 @@
 #define DEBUG_PRINT_POOLS 0
 #define DEBUG_PRINT_DONE 0
 #define DEBUG_PRINT_LOGS 0
+#define DEBUG_PRINT_PERF 0
 
-#define ARR_SIZE 100
+#define ARR_SIZE 20
+#define DISABLE_DNS 1
 
 typedef struct req_params_s{
 	FILE * log_file;
@@ -36,7 +38,6 @@ typedef struct req_params_s{
 	pthread_mutex_t * mutex_index;
 	pthread_mutex_t * mutex_count;
 	pthread_mutex_t * mutex_buffer;
-	pthread_mutex_t * mutex_done;
 	pthread_mutex_t * mutex_req_log;
 	pthread_cond_t * cond_req;
 	pthread_cond_t * cond_res;
@@ -50,7 +51,6 @@ typedef struct res_params_s{
 	int * out;
 	pthread_mutex_t * mutex_count;
 	pthread_mutex_t * mutex_buffer;
-	pthread_mutex_t * mutex_done;
 	pthread_mutex_t * mutex_res_log;
 	pthread_cond_t * cond_res;
 	pthread_cond_t * cond_req;

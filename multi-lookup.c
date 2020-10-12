@@ -36,13 +36,11 @@ int main(int argc, char * argv[]){
 	pthread_mutex_t mutex_index;
 	pthread_mutex_t mutex_count;
 	pthread_mutex_t mutex_buffer;
-	pthread_mutex_t mutex_done;
 	pthread_mutex_t mutex_req_log;
 	pthread_mutex_t mutex_res_log;
 	pthread_mutex_init(&mutex_index, NULL);
 	pthread_mutex_init(&mutex_count, NULL);
 	pthread_mutex_init(&mutex_buffer, NULL);
-	pthread_mutex_init(&mutex_done, NULL);
 	pthread_mutex_init(&mutex_req_log, NULL);
 	pthread_mutex_init(&mutex_res_log, NULL);
 
@@ -75,7 +73,6 @@ int main(int argc, char * argv[]){
 	req_params.mutex_index = &mutex_index;
 	req_params.mutex_count = &mutex_count;
 	req_params.mutex_buffer = &mutex_buffer;
-	req_params.mutex_done = &mutex_done;
 	req_params.mutex_req_log = &mutex_req_log;
 	req_params.cond_req = &cond_req;
 	req_params.cond_res = &cond_res;
@@ -87,7 +84,6 @@ int main(int argc, char * argv[]){
 	res_params.out = &out;
 	res_params.mutex_count = &mutex_count;
 	res_params.mutex_buffer = &mutex_buffer;
-	res_params.mutex_done = &mutex_done;
 	res_params.mutex_res_log = &mutex_res_log;
 	res_params.cond_res = &cond_res;
 	res_params.cond_req = &cond_req;
@@ -103,12 +99,10 @@ int main(int argc, char * argv[]){
 	if(join_pool(req_num, (pthread_t *) (req_pool))) return -1;
 
 	// INFORM CONSUMERS TO EXIT
-	pthread_mutex_lock(&mutex_buffer);
-			pthread_mutex_lock(&mutex_done);
-				done = 1;
-				pthread_cond_broadcast(&cond_res);
-			pthread_mutex_unlock(&mutex_done);
-	pthread_mutex_unlock(&mutex_buffer);
+	pthread_mutex_lock(&mutex_count);
+		done = 1;
+		pthread_cond_broadcast(&cond_res);
+	pthread_mutex_unlock(&mutex_count);
 
 	// JOIN CONSUMER THREAD POOL
 	if(join_pool(res_num, (pthread_t *) (res_pool))) return -1;
@@ -120,7 +114,6 @@ int main(int argc, char * argv[]){
 	pthread_mutex_destroy(&mutex_index);
 	pthread_mutex_destroy(&mutex_count);
 	pthread_mutex_destroy(&mutex_buffer);
-	pthread_mutex_destroy(&mutex_done);
 	pthread_mutex_destroy(&mutex_req_log);
 	pthread_mutex_destroy(&mutex_res_log);
 	pthread_cond_destroy(&cond_req);
@@ -222,10 +215,13 @@ void * res_func(void * ptr){
 		if(DEBUG_PRINT && DEBUG_PRINT_REMOVE) printf("Consumer read %s\n", line);
 
 		// Add DNS part and print to log
-
-		if(dnslookup(line, ip_addr, MAX_IP_LENGTH)){
-			if(DEBUG_PRINT && DEBUG_PRINT_DNS) printf("DNS for %s failed\n", line);
+		if(DISABLE_DNS){
 			ip_addr[0] = '\0';
+		} else {
+			 if(dnslookup(line, ip_addr, MAX_IP_LENGTH)){
+				if(DEBUG_PRINT && DEBUG_PRINT_DNS) printf("DNS for %s failed\n", line);
+				ip_addr[0] = '\0';
+			}
 		}
 
 		add_to_res_log((char *) line, (char *) ip_addr, res_params);
@@ -265,21 +261,18 @@ void add_to_req_log_final(int serviced, req_params_t * req_params){
 int remove_from_buffer(char * line, res_params_t * res_params){
 	pthread_mutex_lock(res_params->mutex_count);
 		while(*(res_params->count) <= 0){
-			pthread_mutex_lock(res_params->mutex_done);
-				if(*(res_params->done)){
-					pthread_mutex_unlock(res_params->mutex_done);
-					pthread_mutex_unlock(res_params->mutex_count);
-					return 1;
-				}
-			pthread_mutex_unlock(res_params->mutex_done);
+			if(*(res_params->done)){
+				pthread_mutex_unlock(res_params->mutex_count);
+				return 1;
+			}
 			pthread_cond_wait(res_params->cond_res, res_params->mutex_count);
 		}
 		pthread_mutex_lock(res_params->mutex_buffer);
-			if(DEBUG_PRINT && DEBUG_PRINT_ADD) printf("Copying str from buffer at index %d offset %d\n", *(res_params->out), MAX_NAME_LENGTH * (*(res_params->out)));
+			if(DEBUG_PRINT && (DEBUG_PRINT_ADD || DEBUG_PRINT_PERF)) printf("Copying str from buffer at index %d offset %d\n", *(res_params->out), MAX_NAME_LENGTH * (*(res_params->out)));
 			strncpy(line, res_params->buffer + (MAX_NAME_LENGTH * (*(res_params->out))), MAX_NAME_LENGTH);
 			*(res_params->out) = (*res_params->out + 1) % ARR_SIZE;
 			*(res_params->count) = (*(res_params->count)) - 1;
-			if(DEBUG_PRINT && DEBUG_PRINT_REMOVE && DEBUG_PRINT_COUNT) printf("Count: %d\n", *(res_params->count));
+			if(DEBUG_PRINT && (DEBUG_PRINT_REMOVE || DEBUG_PRINT_COUNT || DEBUG_PRINT_PERF)) printf("Count: %d\n", *(res_params->count));
 		pthread_mutex_unlock(res_params->mutex_buffer);
 	pthread_mutex_unlock(res_params->mutex_count);
 	pthread_cond_signal(res_params->cond_req);
@@ -305,11 +298,11 @@ void add_to_buffer(char * line, req_params_t * req_params){
 			pthread_cond_wait(req_params->cond_req, req_params->mutex_count);
 		}
 		pthread_mutex_lock(req_params->mutex_buffer);
-			if(DEBUG_PRINT && DEBUG_PRINT_ADD) printf("Copying str to buffer at index %d offset %d\n", *(req_params->in), MAX_NAME_LENGTH * (*(req_params->in)));
+			if(DEBUG_PRINT && (DEBUG_PRINT_ADD || DEBUG_PRINT_PERF)) printf("Copying str to buffer at index %d offset %d\n", *(req_params->in), MAX_NAME_LENGTH * (*(req_params->in)));
 			strncpy(req_params->buffer + (MAX_NAME_LENGTH * (*(req_params->in))), line, MAX_NAME_LENGTH);
 			*(req_params->in) = (*(req_params->in) + 1) % ARR_SIZE;
 			*(req_params->count) = (*(req_params->count)) + 1;
-			if(DEBUG_PRINT && DEBUG_PRINT_ADD)printf("Count: %d\n", *(req_params->count));
+			if(DEBUG_PRINT && (DEBUG_PRINT_ADD || DEBUG_PRINT_PERF))printf("Count: %d\n", *(req_params->count));
 		pthread_mutex_unlock(req_params->mutex_buffer);
 	pthread_mutex_unlock(req_params->mutex_count);
 	pthread_cond_signal(req_params->cond_res);
