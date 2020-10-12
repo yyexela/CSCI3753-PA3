@@ -56,8 +56,7 @@ int main(int argc, char * argv[]){
 	// CHECK FOR LOG FILES
 	if(open_log(&req_log, (char *) (argv[3])) != 0 || open_log(&res_log, (char *) (argv[4])) != 0) return -1;
 
-	// CREATE ARGS FOR THREAD POOLS
-	// if(create_req_params(&req_params, argv, req_log, buffer, &index, &count, &in, &argc, &mutex_index, &mutex_count, &mutex_buffer, &mutex_done, &mutex_req_log, &cond_req, &cond_res, &done) || create_res_params(&res_params, res_log, buffer, &count, &out, &mutex_count, &mutex_buffer, &mutex_done, &mutex_res_log, &cond_req, &cond_res, &done)) return 0;
+	// CREATE ARGS FOR THREAD POOLS VIA STRUCTS
 
 	req_params.log_file = req_log;
 	req_params.buffer = buffer;
@@ -139,27 +138,43 @@ void * req_func(void * ptr){
 	FILE * input_file = NULL;
 	char * line = (char *) malloc(sizeof(char) * MAX_NAME_LENGTH);
 	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Malloc: req line %p of size %lu\n", line, sizeof(char) * MAX_NAME_LENGTH);
+	int file_status = 0;
+	int serviced = 0;
 
 	// Main producer loop
 	while(1){
 		// Get a file
-		if(get_next_file(&input_file, req_params)){
+		file_status = get_next_file(&input_file, req_params);
+		if(file_status == 1){
+			// Print how many files were serviced
+			strncpy(line, "T", MAX_NAME_LENGTH);
+			add_to_req_log_final(serviced, req_params);
 			// Free and exit when no more files
 			free(line);
 			if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Free: req line %p\n", line);
 			return 0;
-		}
-		
-		// Produce lines from the input file
-		while(read_line((char *) line, input_file, req_params) == 0){
-				// Put lines into the buffer
-				add_to_buffer((char *) line, req_params);
-		}
+		} else if(file_status == 2){
+			// File doesn't exist
+			// Increment serviced
+			serviced++;
+		} else if (file_status == 0) {
+			// File exists and has been opened
+			// Produce lines from the input file
+			while(read_line((char *) line, input_file, req_params) == 0){
+					// Put lines into the buffer
+					add_to_buffer((char *) line, req_params);
+					// Put names into req_log
+					add_to_req_log((char *) line, req_params);
+			}
 
-		// Close opened file
-		if(input_file != NULL){
-			if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("Thread %lu closed a file\n", pthread_self());
-			fclose(input_file);
+			// Close opened file
+			if(input_file != NULL){
+				if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("Thread %lu closed a file\n", pthread_self());
+				fclose(input_file);
+			}
+
+			// Increment serviced
+			serviced++;
 		}
 	}	
 	printf("SHOULD NEVER BE HERE\n");
@@ -189,6 +204,23 @@ void * res_func(void * ptr){
 	free(line);
 	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Free: res line %p\n", line);
 	return 0;
+}
+
+void add_to_req_log(char * line, req_params_t * req_params){
+	// Add newline to end of buffer
+	line[strlen(line)] = '\n';
+	pthread_mutex_lock(req_params->mutex_req_log);
+		if(DEBUG_PRINT && DEBUG_PRINT_LOGS) printf("req_log: Acquired lock\n");
+		fprintf(req_params->log_file, "%s", line);
+	pthread_mutex_unlock(req_params->mutex_req_log);
+}
+
+void add_to_req_log_final(int serviced, req_params_t * req_params){
+	// Add newline to end of buffer
+	pthread_mutex_lock(req_params->mutex_req_log);
+		if(DEBUG_PRINT && DEBUG_PRINT_LOGS) printf("req_log_final: Acquired lock\n");
+		fprintf(req_params->log_file, "Thread %lu serviced %d files.\n", pthread_self(), serviced);
+	pthread_mutex_unlock(req_params->mutex_req_log);
 }
 
 // return 1 only when done, return 0 when read item
@@ -252,19 +284,23 @@ void add_to_buffer(char * line, req_params_t * req_params){
 	pthread_cond_signal(req_params->cond_res);
 }
 
-// Return non-zero value when no next file or error
+// Returns:
+// 0  -   valid file, opened
+// 1  -   when no next file
+// 2  -   invalid file
 int get_next_file(FILE ** input_file, req_params_t * req_params){
 	pthread_mutex_lock(req_params->mutex_index);
 		if(*(req_params->index) >= *(req_params->argc)){
-			if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("get_next_file: Reached end of input files\n");
 			pthread_mutex_unlock(req_params->mutex_index);
+			if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("get_next_file: Reached end of input files\n");
 			return 1;
 		}
 		(*input_file) = fopen(req_params->argv[*(req_params->index)], "r+");
 		if(*input_file == NULL){
-			if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("get_next_file: invalid file\n");
+			*(req_params->index) = (*(req_params->index)) + 1;
 			pthread_mutex_unlock(req_params->mutex_index);
-			return 1;
+			if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("get_next_file: invalid file\n");
+			return 2;
 		}
 		if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("get_next_file: Thread %lu opened %s\n", pthread_self(), req_params->argv[*(req_params->index)]);
 		*(req_params->index) = (*(req_params->index)) + 1;
@@ -333,7 +369,7 @@ int join_pool(int num, pthread_t * arr){
 }
 
 int open_log(FILE ** log, char * file_name){
-	(*log) = fopen(file_name, "r+");
+	(*log) = fopen(file_name, "w");
 	if(log == NULL){
 		printf("Error opening %s\n", file_name);
 		return -1;

@@ -10,9 +10,9 @@
 #define MAX_NAME_LENGTH 1025
 #define MAX_IP_LENGTH INET6_ADDRSTRLEN
 
-#define DEBUG_PRINT 0
+#define DEBUG_PRINT 1
 #define DEBUG_PRINT_THREAD 0
-#define DEBUG_PRINT_NEXT_FILE 0
+#define DEBUG_PRINT_NEXT_FILE 1
 #define DEBUG_PRINT_DNS 0
 #define DEBUG_PRINT_REMOVE 0
 #define DEBUG_PRINT_ADD 0
@@ -20,6 +20,7 @@
 #define DEBUG_PRINT_MALLOC 0
 #define DEBUG_PRINT_POOLS 0
 #define DEBUG_PRINT_DONE 0
+#define DEBUG_PRINT_LOGS 1
 
 #define ARR_SIZE 10
 
@@ -66,6 +67,8 @@ int get_next_file(FILE ** input_file, req_params_t * req_params);
 int read_line(char * line, FILE * input_file, req_params_t * req_params);
 void add_to_buffer(char * line, req_params_t * req_params);
 int remove_from_buffer(char * line, res_params_t * res_params);
+void add_to_req_log(char * line, req_params_t * req_params);
+void add_to_req_log_final(int serviced, req_params_t * req_params);
 
 #endif
 
