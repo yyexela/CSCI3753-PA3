@@ -1,9 +1,16 @@
 #include<pthread.h>
 #include <unistd.h> // TODO: Remove when done, for sleep(n)
+#include<sys/time.h> // For time
 #include"util.h"
 #include"multi-lookup.h"
 
 int main(int argc, char * argv[]){
+	struct timeval time_start;
+	struct timeval time_end;
+	if(gettimeofday(&time_start, NULL)){
+		printf("Error getting start time\n");
+		return -1;
+	}
 
 	// VARIABLES
 
@@ -127,6 +134,15 @@ int main(int argc, char * argv[]){
 
 	if(DEBUG_PRINT && DEBUG_PRINT_DONE) printf("Successfully finished\n");
 
+	// PRINT RUN TIME
+
+	if(gettimeofday(&time_end, NULL)){
+		printf("Error getting end time\n");
+		return -1;
+	}
+	
+	printf("./multi-lookup ran for %ld.%ld seconds\n", time_end.tv_sec - time_start.tv_sec, time_end.tv_usec - time_start.tv_usec);
+
 	return 0;
 }
 
@@ -146,6 +162,8 @@ void * req_func(void * ptr){
 		// Get a file
 		file_status = get_next_file(&input_file, req_params);
 		if(file_status == 1){
+			// NO MORE FILES LEFT
+
 			// Print how many files were serviced
 			strncpy(line, "T", MAX_NAME_LENGTH);
 			add_to_req_log_final(serviced, req_params);
@@ -154,17 +172,20 @@ void * req_func(void * ptr){
 			if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Free: req line %p\n", line);
 			return 0;
 		} else if(file_status == 2){
-			// File doesn't exist
+			// FILE DOESN'T EXIST
+
 			// Increment serviced
 			serviced++;
 		} else if (file_status == 0) {
-			// File exists and has been opened
+			// FILE EXISTS AND OPENED
+
 			// Produce lines from the input file
 			while(read_line((char *) line, input_file, req_params) == 0){
-					// Put lines into the buffer
-					add_to_buffer((char *) line, req_params);
-					// Put names into req_log
-					add_to_req_log((char *) line, req_params);
+				if(DEBUG_PRINT && DEBUG_PRINT_LOGS_STDOUT) printf("Thread %lu reads %s\n", pthread_self(), line);
+				// Put lines into the buffer
+				add_to_buffer((char *) line, req_params);
+				// Put names into req_log
+				add_to_req_log((char *) line, req_params);
 			}
 
 			// Close opened file
@@ -187,6 +208,7 @@ void * res_func(void * ptr){
 	// Cast parameters to struct
 	res_params_t * res_params = (res_params_t *) ptr;
 	char * line = (char *) malloc(sizeof(char) * MAX_NAME_LENGTH);
+	char ip_addr[MAX_IP_LENGTH];
 	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Malloc: req line %p of size %lu\n", line, sizeof(char) * MAX_NAME_LENGTH);
 
 	// Main consumer loop
@@ -198,7 +220,19 @@ void * res_func(void * ptr){
 			return 0;
 		}
 		if(DEBUG_PRINT && DEBUG_PRINT_REMOVE) printf("Consumer read %s\n", line);
+
+		// Add DNS part and print to log
+
+		if(dnslookup(line, ip_addr, MAX_IP_LENGTH)){
+			if(DEBUG_PRINT && DEBUG_PRINT_DNS) printf("DNS for %s failed\n", line);
+			ip_addr[0] = '\0';
+		}
+
+		add_to_res_log((char *) line, (char *) ip_addr, res_params);
+		if(DEBUG_PRINT && DEBUG_PRINT_LOGS_STDOUT) printf("Thread %lu reads %s as %s\n", pthread_self(), line, ip_addr);
+		
 	}
+
 
 	printf("SHOULD NEVER BE HERE\n");
 	free(line);
@@ -206,17 +240,21 @@ void * res_func(void * ptr){
 	return 0;
 }
 
+void add_to_res_log(char * name, char * ip_addr, res_params_t * res_params){
+	pthread_mutex_lock(res_params->mutex_res_log);
+		if(DEBUG_PRINT && DEBUG_PRINT_LOGS) printf("res_log: Acquired lock\n");
+		fprintf(res_params->log_file, "%s,%s\n", name, ip_addr);
+	pthread_mutex_unlock(res_params->mutex_res_log);
+}
+
 void add_to_req_log(char * line, req_params_t * req_params){
-	// Add newline to end of buffer
-	line[strlen(line)] = '\n';
 	pthread_mutex_lock(req_params->mutex_req_log);
 		if(DEBUG_PRINT && DEBUG_PRINT_LOGS) printf("req_log: Acquired lock\n");
-		fprintf(req_params->log_file, "%s", line);
+		fprintf(req_params->log_file, "%s\n", line);
 	pthread_mutex_unlock(req_params->mutex_req_log);
 }
 
 void add_to_req_log_final(int serviced, req_params_t * req_params){
-	// Add newline to end of buffer
 	pthread_mutex_lock(req_params->mutex_req_log);
 		if(DEBUG_PRINT && DEBUG_PRINT_LOGS) printf("req_log_final: Acquired lock\n");
 		fprintf(req_params->log_file, "Thread %lu serviced %d files.\n", pthread_self(), serviced);
@@ -251,19 +289,12 @@ int remove_from_buffer(char * line, res_params_t * res_params){
 
 // Returns 0 on successful line, 1 otherwise
 int read_line(char * line, FILE * input_file, req_params_t * req_params){
-	//char ip_addr[MAX_IP_LENGTH];
 	if(fgets(line, MAX_NAME_LENGTH, input_file) != NULL){
 		long bytes = strlen(line);
 		if(bytes != 0){
 			line[bytes-1] = '\0';
 		}
 		return 0;
-		/*if(dnslookup(line, ip_addr, MAX_IP_LENGTH)){
-			if(DEBUG_PRINT && DEBUG_PRINT_DNS) printf("DNS for %s failed\n", line);
-			ip_addr[0] = '\0';
-		}
-		if(DEBUG_PRINT && DEBUG_PRINT_DNS) printf("Thread %lu reads %s as %s\n", pthread_self(), line, ip_addr);
-		*/
 	}
 	return 1;
 }
