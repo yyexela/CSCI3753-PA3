@@ -11,8 +11,13 @@
 #define MAX_IP_LENGTH INET6_ADDRSTRLEN
 
 #define DEBUG_PRINT 1
-#define DEBUG_PRINT_THREAD 0
+#define DEBUG_PRINT_THREAD 1
 #define DEBUG_PRINT_NEXT_FILE 0
+#define DEBUG_PRINT_DNS 1
+#define DEBUG_PRINT_REMOVE 1
+#define DEBUG_PRINT_ADD 0
+#define DEBUG_PRINT_COUNT 0
+
 #define ARR_SIZE 10
 
 typedef struct req_params_s{
@@ -21,16 +26,28 @@ typedef struct req_params_s{
 	char ** argv;
 	int * index;
 	int * count;
-	int * out;
-	pthread_mutex_t * mutex_index;
+	int * in;
 	int * argc;
+	pthread_mutex_t * mutex_index;
+	pthread_mutex_t * mutex_count;
+	pthread_mutex_t * mutex_buffer;
+	pthread_mutex_t * mutex_done;
+	pthread_cond_t * cond_req;
+	pthread_cond_t * cond_res;
+	int * done;
 } req_params_t;
 
 typedef struct res_params_s{
 	FILE * log_file;
 	void * buffer;
 	int * count;
-	int * in;
+	int * out;
+	pthread_mutex_t * mutex_count;
+	pthread_mutex_t * mutex_buffer;
+	pthread_mutex_t * mutex_done;
+	pthread_cond_t * cond_res;
+	pthread_cond_t * cond_req;
+	int * done;
 } res_params_t;
 
 void * req_func(void * ptr);
@@ -40,9 +57,12 @@ int join_pool(int num, pthread_t * arr);
 int open_log(FILE ** log, char * file_name);
 int check_args(int argc, char * argv[]);
 int get_req_res_num(long * req_num, long * res_num, char * argv[]);
-int create_req_params(req_params_t * res_params, char ** argv, FILE * log_file, void * buffer, int * index, int * count, int * out, pthread_mutex_t * mutex_index, int * argc);
-int create_res_params(res_params_t * res_params, FILE * log_file, void * buffer, int * count, int * in);
-int get_next_file(FILE ** input_file, pthread_mutex_t * mutex_index, int * argc, int * index, char ** argv);
+int create_req_params(req_params_t * res_params, char ** argv, FILE * log_file, void * buffer, int * index, int * count, int * in, int * argc, pthread_mutex_t * mutex_index, pthread_mutex_t * mutex_count, pthread_mutex_t * mutex_buffer, pthread_mutex_t * mutex_done, pthread_cond_t * cond_req, pthread_cond_t * cond_res, int * done);
+int create_res_params(res_params_t * res_params, FILE * log_file, void * buffer, int * count, int * out, pthread_mutex_t * mutex_count, pthread_mutex_t * mutex_buffer, pthread_mutex_t * mutex_done, pthread_cond_t * cond_req, pthread_cond_t * cond_res, int * done);
+int get_next_file(FILE ** input_file, req_params_t * req_params);
+void read_line(FILE * input_file, req_params_t * req_params);
+void add_to_buffer(char * line, req_params_t * req_params);
+int remove_from_buffer(res_params_t * res_params);
 
 #endif
 
