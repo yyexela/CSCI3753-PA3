@@ -2,3 +2,5 @@
 *.swp
 *.txt
 multi-lookup
+core.*
+gmon.out
