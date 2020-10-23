@@ -18,9 +18,9 @@ int main(int argc, char * argv[]){
 	FILE * res_log = NULL;
 	long req_num, res_num;
 	// pthread_t * req_pool, res_pool; // DEFINED LATER
-	void * buffer = malloc(MAX_NAME_LENGTH * ARR_SIZE * sizeof(char));
+	void * buffer = malloc(MAX_NAME_LENGTH * ARRAY_SIZE * sizeof(char));
 
-	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Malloc: buffer %p size %lu\n", buffer, MAX_NAME_LENGTH * ARR_SIZE * sizeof(char));
+	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Malloc: buffer %p size %lu\n", buffer, MAX_NAME_LENGTH * ARRAY_SIZE * sizeof(char));
 
 	res_params_t res_params;
 	req_params_t req_params;
@@ -270,7 +270,7 @@ int remove_from_buffer(char * line, res_params_t * res_params){
 		pthread_mutex_lock(res_params->mutex_buffer);
 			if(DEBUG_PRINT && (DEBUG_PRINT_ADD || DEBUG_PRINT_PERF)) printf("Copying str from buffer at index %d offset %d\n", *(res_params->out), MAX_NAME_LENGTH * (*(res_params->out)));
 			strncpy(line, res_params->buffer + (MAX_NAME_LENGTH * (*(res_params->out))), MAX_NAME_LENGTH);
-			*(res_params->out) = (*res_params->out + 1) % ARR_SIZE;
+			*(res_params->out) = (*res_params->out + 1) % ARRAY_SIZE;
 			*(res_params->count) = (*(res_params->count)) - 1;
 			if(DEBUG_PRINT && (DEBUG_PRINT_REMOVE || DEBUG_PRINT_COUNT || DEBUG_PRINT_PERF)) printf("Count: %d\n", *(res_params->count));
 		pthread_mutex_unlock(res_params->mutex_buffer);
@@ -294,13 +294,13 @@ int read_line(char * line, FILE * input_file){
 
 void add_to_buffer(char * line, req_params_t * req_params){
 	pthread_mutex_lock(req_params->mutex_count);
-		while(*(req_params->count) >= ARR_SIZE-1){
+		while(*(req_params->count) >= ARRAY_SIZE-1){
 			pthread_cond_wait(req_params->cond_req, req_params->mutex_count);
 		}
 		pthread_mutex_lock(req_params->mutex_buffer);
 			if(DEBUG_PRINT && (DEBUG_PRINT_ADD || DEBUG_PRINT_PERF)) printf("Copying str to buffer at index %d offset %d\n", *(req_params->in), MAX_NAME_LENGTH * (*(req_params->in)));
 			strncpy(req_params->buffer + (MAX_NAME_LENGTH * (*(req_params->in))), line, MAX_NAME_LENGTH);
-			*(req_params->in) = (*(req_params->in) + 1) % ARR_SIZE;
+			*(req_params->in) = (*(req_params->in) + 1) % ARRAY_SIZE;
 			*(req_params->count) = (*(req_params->count)) + 1;
 			if(DEBUG_PRINT && (DEBUG_PRINT_ADD || DEBUG_PRINT_PERF))printf("Count: %d\n", *(req_params->count));
 		pthread_mutex_unlock(req_params->mutex_buffer);

@@ -24,7 +24,7 @@
 #define DEBUG_PRINT_LOGS 0
 #define DEBUG_PRINT_PERF 0
 
-#define ARR_SIZE 20
+#define ARRAY_SIZE 20
 #define DISABLE_DNS 1
 
 typedef struct req_params_s{
