@@ -3,6 +3,7 @@
 *.txt
 !performance.txt
 !performance_dns.txt
+!PA3-alye2545.txt
 multi-lookup
 core.*
 gmon.out
