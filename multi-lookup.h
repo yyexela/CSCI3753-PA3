@@ -25,7 +25,7 @@
 #define DEBUG_PRINT_PERF 0
 
 #define ARRAY_SIZE 20
-#define DISABLE_DNS 1
+#define DISABLE_DNS 0
 
 typedef struct req_params_s{
 	FILE * log_file;
