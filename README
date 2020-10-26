@@ -1,9 +1,12 @@
+pthread.h
+ - Provided header file for pthread library. (NOT MY CODE, CREDIT: POSIX)
+
 util.h
- - Provided header file for util.c.
+ - Provided header file for util.c. (NOT MY CODE, CREDIT: CSCI 3753 CU BOULDER)
  - Contains macro for error codes for `dnslookup(...)` function along with comment explaining how that function works. Contains the `dnslookup(...)` function prototype.
 
 util.c
- - Provided C file.
+ - Provided C file. (NOT MY CODE, CREDIT: CSCI 3753 CU BOULDER)
  - Contains `dnslookup(...)` function, used to perform a DNS lookup for a provided hostname and stores the value in a passed in character array. The maximum number size of the returned string is a parameter.
 
 multiookup.h
