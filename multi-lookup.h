@@ -9,6 +9,7 @@
 #define MAX_REQUESTER_THREADS 5
 #define MAX_NAME_LENGTH 1025
 #define MAX_IP_LENGTH INET6_ADDRSTRLEN
+#define ARRAY_SIZE 20
 
 #define DEBUG_PRINT 0
 #define DEBUG_PRINT_THREAD 0
@@ -24,7 +25,6 @@
 #define DEBUG_PRINT_LOGS 0
 #define DEBUG_PRINT_PERF 0
 
-#define ARRAY_SIZE 20
 #define DISABLE_DNS 0
 
 typedef struct req_params_s{
