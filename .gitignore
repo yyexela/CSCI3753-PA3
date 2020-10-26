@@ -1,6 +1,8 @@
 *.o
 *.swp
 *.txt
+!performance.txt
+!performance_dns.txt
 multi-lookup
 core.*
 gmon.out
