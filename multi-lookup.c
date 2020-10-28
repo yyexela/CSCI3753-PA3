@@ -14,7 +14,7 @@ int main(int argc, char * argv[]){
 	struct timeval time_start;
 	struct timeval time_end;
 	if(gettimeofday(&time_start, NULL)){
-		printf("Error getting start time\n");
+		fprintf(stderr, "Error getting start time\n");
 		return -1;
 	}
 
@@ -32,7 +32,7 @@ int main(int argc, char * argv[]){
 	int index = 5; // position of next file input
 	int done = 0; // set to 1 when all files are processed
 
-	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Malloc: buffer %p size %lu\n", buffer, MAX_NAME_LENGTH * ARRAY_SIZE * sizeof(char));
+	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) fprintf(stderr, "Malloc: buffer %p size %lu\n", buffer, MAX_NAME_LENGTH * ARRAY_SIZE * sizeof(char));
 
 	// MUTEXES
 	pthread_mutex_t mutex_index; // Used by requesters for which files were serviced
@@ -45,7 +45,7 @@ int main(int argc, char * argv[]){
 		pthread_mutex_init(&mutex_buffer, NULL) ||
 		pthread_mutex_init(&mutex_req_log, NULL) ||
 		pthread_mutex_init(&mutex_res_log, NULL)){
-		printf("Error initializing mutexes\n");
+		fprintf(stderr, "Error initializing mutexes\n");
 		return -1;
 	}
 
@@ -54,7 +54,7 @@ int main(int argc, char * argv[]){
 	pthread_cond_t cond_res; // Used by requesters to signal blockres resolvers
 	if( pthread_cond_init(&cond_req, NULL) ||
 		pthread_cond_init(&cond_res, NULL)){
-		printf("Error initializing conditional variables\n");
+		fprintf(stderr, "Error initializing conditional variables\n");
 		return -1;
 	}
 
@@ -125,29 +125,29 @@ int main(int argc, char * argv[]){
 		pthread_mutex_destroy(&mutex_res_log) ||
 		pthread_cond_destroy(&cond_req) ||
 		pthread_cond_destroy(&cond_res)){
-		printf("Error destroying mutexes/conditional variables\n");
+		fprintf(stderr, "Error destroying mutexes/conditional variables\n");
 		return -1;
 	}
 
 	// CLOSE FILES
 	if( fclose(res_log) || 
 		fclose(req_log)) {
-		printf("Error closing log files\n");
+		fprintf(stderr, "Error closing log files\n");
 		return -1;
 	}
 
-	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Free: buffer %p\n", buffer);
+	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) fprintf(stderr, "Free: buffer %p\n", buffer);
 
-	if(DEBUG_PRINT && DEBUG_PRINT_DONE) printf("Successfully finished\n");
+	if(DEBUG_PRINT && DEBUG_PRINT_DONE) fprintf(stderr, "Successfully finished\n");
 
 	// GET END TIME
 	if(gettimeofday(&time_end, NULL)){
-		printf("Error getting end time\n");
+		fprintf(stderr, "Error getting end time\n");
 		return -1;
 	}
 
 	// PRINT RUN TIME
-	printf("./multi-lookup total time is %f seconds\n",
+	fprintf(stdout, "./multi-lookup total time is %f seconds\n",
 		(double) (((time_end.tv_sec * 1000000 + time_end.tv_usec) -
 		(time_start.tv_sec * 1000000 + time_start.tv_usec))/1000000.0));
 
@@ -162,7 +162,7 @@ void * req_func(void * ptr){
 	// Create thread-specific variables
 	FILE * input_file = NULL; // Current file that is being read
 	char * line = (char *) malloc(sizeof(char) * MAX_NAME_LENGTH); // Last line read
-	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Malloc: req line %p of size %lu\n", line, sizeof(char) * MAX_NAME_LENGTH);
+	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) fprintf(stderr, "Malloc: req line %p of size %lu\n", line, sizeof(char) * MAX_NAME_LENGTH);
 	int file_status = 0; // 
 	int serviced = 0; // Number of files serviced
 
@@ -175,7 +175,7 @@ void * req_func(void * ptr){
 			// Print how many files were serviced
 			add_to_req_log_final(serviced, req_params);
 			free(line);
-			if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Free: req line %p\n", line);
+			if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) fprintf(stderr, "Free: req line %p\n", line);
 			return 0;
 		} else if(file_status == 2){
 			// FILE DOESN'T EXIST
@@ -185,7 +185,7 @@ void * req_func(void * ptr){
 			// FILE EXISTS AND OPENED
 			// Produce lines from the input file
 			while(read_line((char *) line, input_file) == 0){
-				if(DEBUG_PRINT && DEBUG_PRINT_LOGS_STDOUT) printf("Thread %lu reads %s\n", pthread_self(), line);
+				if(DEBUG_PRINT && DEBUG_PRINT_LOGS_STDOUT) fprintf(stderr, "Thread %lu reads %s\n", pthread_self(), line);
 				// Put lines into the buffer
 				add_to_buffer((char *) line, req_params);
 				// Put names into req_log
@@ -194,8 +194,8 @@ void * req_func(void * ptr){
 
 			// Close opened file
 			if(input_file != NULL){
-				if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("Thread %lu closed a file\n", pthread_self());
-				if(fclose(input_file)) printf("Error closing input file\n");
+				if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)fprintf(stderr, "Thread %lu closed a file\n", pthread_self());
+				if(fclose(input_file)) fprintf(stderr, "Error closing input file\n");
 			}
 
 			// Increment serviced
@@ -214,11 +214,11 @@ void add_to_buffer(char * line, req_params_t * req_params){
 		}
 		// Add item to buffer
 		pthread_mutex_lock(req_params->mutex_buffer);
-			if(DEBUG_PRINT && (DEBUG_PRINT_ADD || DEBUG_PRINT_PERF)) printf("Copying str to buffer at index %d offset %d\n", *(req_params->in), MAX_NAME_LENGTH * (*(req_params->in)));
+			if(DEBUG_PRINT && (DEBUG_PRINT_ADD || DEBUG_PRINT_PERF)) fprintf(stderr, "Copying str to buffer at index %d offset %d\n", *(req_params->in), MAX_NAME_LENGTH * (*(req_params->in)));
 			strncpy(req_params->buffer + (MAX_NAME_LENGTH * (*(req_params->in))), line, MAX_NAME_LENGTH);
 			*(req_params->in) = (*(req_params->in) + 1) % ARRAY_SIZE;
 			*(req_params->count) = (*(req_params->count)) + 1;
-			if(DEBUG_PRINT && (DEBUG_PRINT_ADD || DEBUG_PRINT_PERF))printf("Count: %d\n", *(req_params->count));
+			if(DEBUG_PRINT && (DEBUG_PRINT_ADD || DEBUG_PRINT_PERF))fprintf(stderr, "Count: %d\n", *(req_params->count));
 		pthread_mutex_unlock(req_params->mutex_buffer);
 	pthread_mutex_unlock(req_params->mutex_count);
 	// Signal any waiting resolvers
@@ -236,7 +236,7 @@ int get_next_file(FILE ** input_file, req_params_t * req_params){
 		if(*(req_params->index) >= *(req_params->argc)){
 			// Reached end of command line arguments, no more files to service
 			pthread_mutex_unlock(req_params->mutex_index);
-			if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("get_next_file: Reached end of input files\n");
+			if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)fprintf(stderr, "get_next_file: Reached end of input files\n");
 			return 1;
 		}
 		// Open file for reading, start from the beginning of the file
@@ -245,11 +245,11 @@ int get_next_file(FILE ** input_file, req_params_t * req_params){
 			// File is invalid/doesn't exist
 			*(req_params->index) = (*(req_params->index)) + 1;
 			pthread_mutex_unlock(req_params->mutex_index);
-			if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("get_next_file: invalid file\n");
+			if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)fprintf(stderr, "get_next_file: invalid file\n");
 			return 2;
 		}
 		// File was successfully opened
-		if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)printf("get_next_file: Thread %lu opened %s\n", pthread_self(), req_params->argv[*(req_params->index)]);
+		if(DEBUG_PRINT && DEBUG_PRINT_NEXT_FILE)fprintf(stderr, "get_next_file: Thread %lu opened %s\n", pthread_self(), req_params->argv[*(req_params->index)]);
 		*(req_params->index) = (*(req_params->index)) + 1;
 	pthread_mutex_unlock(req_params->mutex_index);
 	return 0;
@@ -273,7 +273,7 @@ int read_line(char * line, FILE * input_file){
 // Print line to req_log
 void add_to_req_log(char * line, req_params_t * req_params){
 	pthread_mutex_lock(req_params->mutex_req_log);
-		if(DEBUG_PRINT && DEBUG_PRINT_LOGS) printf("req_log: Acquired lock\n");
+		if(DEBUG_PRINT && DEBUG_PRINT_LOGS) fprintf(stderr, "req_log: Acquired lock\n");
 		fprintf(req_params->log_file, "%s\n", line);
 	pthread_mutex_unlock(req_params->mutex_req_log);
 }
@@ -281,7 +281,7 @@ void add_to_req_log(char * line, req_params_t * req_params){
 // Print how many logs the requester thread serviced
 void add_to_req_log_final(int serviced, req_params_t * req_params){
 	pthread_mutex_lock(req_params->mutex_req_log);
-		if(DEBUG_PRINT && DEBUG_PRINT_LOGS) printf("req_log_final: Acquired lock\n");
+		if(DEBUG_PRINT && DEBUG_PRINT_LOGS) fprintf(stderr, "req_log_final: Acquired lock\n");
 		fprintf(req_params->log_file, "Thread %lu serviced %d files.\n", pthread_self(), serviced);
 	pthread_mutex_unlock(req_params->mutex_req_log);
 }
@@ -293,30 +293,30 @@ void * res_func(void * ptr){
 	char * line = (char *) malloc(sizeof(char) * MAX_NAME_LENGTH); // Line for getting from buffer and putting to log file
 	char ip_addr[MAX_IP_LENGTH]; // Where the result of the DNS lookup function is stored
 
-	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Malloc: req line %p of size %lu\n", line, sizeof(char) * MAX_NAME_LENGTH);
+	if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) fprintf(stderr, "Malloc: req line %p of size %lu\n", line, sizeof(char) * MAX_NAME_LENGTH);
 
 	// Main consumer loop
 	while(1){
 		if(remove_from_buffer((char *) line, res_params)){
 			// Free allocated memory and exit when no more producers
 			free(line);
-			if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) printf("Free: res line %p\n", line);
+			if(DEBUG_PRINT && DEBUG_PRINT_MALLOC) fprintf(stderr, "Free: res line %p\n", line);
 			return 0;
 		}
-		if(DEBUG_PRINT && DEBUG_PRINT_REMOVE) printf("Consumer read %s\n", line);
+		if(DEBUG_PRINT && DEBUG_PRINT_REMOVE) fprintf(stderr, "Consumer read %s\n", line);
 
 		// Add DNS part and print to log
 		if(DISABLE_DNS){
 			ip_addr[0] = '\0';
 		} else {
 			 if(dnslookup(line, ip_addr, MAX_IP_LENGTH) == UTIL_FAILURE){
-				printf("Bogus hostname: %s\n", line);
+				fprintf(stderr, "Bogus hostname: %s\n", line);
 				ip_addr[0] = '\0';
 			}
 		}
 
 		add_to_res_log((char *) line, (char *) ip_addr, res_params);
-		if(DEBUG_PRINT && DEBUG_PRINT_LOGS_STDOUT) printf("Thread %lu reads %s as %s\n", pthread_self(), line, ip_addr);
+		if(DEBUG_PRINT && DEBUG_PRINT_LOGS_STDOUT) fprintf(stderr, "Thread %lu reads %s as %s\n", pthread_self(), line, ip_addr);
 		
 	}
 }
@@ -335,11 +335,11 @@ int remove_from_buffer(char * line, res_params_t * res_params){
 		}
 		// Remove item from buffer
 		pthread_mutex_lock(res_params->mutex_buffer);
-			if(DEBUG_PRINT && (DEBUG_PRINT_ADD || DEBUG_PRINT_PERF)) printf("Copying str from buffer at index %d offset %d\n", *(res_params->out), MAX_NAME_LENGTH * (*(res_params->out)));
+			if(DEBUG_PRINT && (DEBUG_PRINT_ADD || DEBUG_PRINT_PERF)) fprintf(stderr, "Copying str from buffer at index %d offset %d\n", *(res_params->out), MAX_NAME_LENGTH * (*(res_params->out)));
 			strncpy(line, res_params->buffer + (MAX_NAME_LENGTH * (*(res_params->out))), MAX_NAME_LENGTH);
 			*(res_params->out) = (*res_params->out + 1) % ARRAY_SIZE;
 			*(res_params->count) = (*(res_params->count)) - 1;
-			if(DEBUG_PRINT && (DEBUG_PRINT_REMOVE || DEBUG_PRINT_COUNT || DEBUG_PRINT_PERF)) printf("Count: %d\n", *(res_params->count));
+			if(DEBUG_PRINT && (DEBUG_PRINT_REMOVE || DEBUG_PRINT_COUNT || DEBUG_PRINT_PERF)) fprintf(stderr, "Count: %d\n", *(res_params->count));
 		pthread_mutex_unlock(res_params->mutex_buffer);
 	pthread_mutex_unlock(res_params->mutex_count);
 	// Signal producers there is space in the buffer
@@ -352,7 +352,7 @@ int remove_from_buffer(char * line, res_params_t * res_params){
 void add_to_res_log(char * name, char * ip_addr, res_params_t * res_params){
 	// Lock resolver log mutex
 	pthread_mutex_lock(res_params->mutex_res_log);
-		if(DEBUG_PRINT && DEBUG_PRINT_LOGS) printf("res_log: Acquired lock\n");
+		if(DEBUG_PRINT && DEBUG_PRINT_LOGS) fprintf(stderr, "res_log: Acquired lock\n");
 		fprintf(res_params->log_file, "%s,%s\n", name, ip_addr);
 	pthread_mutex_unlock(res_params->mutex_res_log);
 }
@@ -361,17 +361,17 @@ void add_to_res_log(char * name, char * ip_addr, res_params_t * res_params){
 int get_req_res_num(long * req_num, long * res_num, char * argv[]){
 	*(req_num) = strtol(argv[1], &argv[2]-1,10);
 	if(*(req_num) < 0 || *(req_num) > MAX_REQUESTER_THREADS){
-		printf("Ensure 1 to %d requesters\n", MAX_REQUESTER_THREADS);
+		fprintf(stderr, "Ensure 1 to %d requesters\n", MAX_REQUESTER_THREADS);
 		return -1;
 	}
-	printf("Number of requester threads is: %ld\n", *(req_num));
+	//fprintf(stderr, "Number of requester threads is: %ld\n", *(req_num));
 
 	*(res_num) = strtol(argv[2], &argv[3]-1,10);
 	if(*(res_num) < 0 || *(res_num) > MAX_RESOLVER_THREADS){
-		printf("Ensure 1 to %d resolvers\n", MAX_RESOLVER_THREADS);
+		fprintf(stderr, "Ensure 1 to %d resolvers\n", MAX_RESOLVER_THREADS);
 		return -1;
 	}
-	printf("Number of resolver threads is: %ld\n", *(res_num));
+	//fprintf(stderr, "Number of resolver threads is: %ld\n", *(res_num));
 
 	return 0;
 }
@@ -381,14 +381,14 @@ int get_req_res_num(long * req_num, long * res_num, char * argv[]){
 int check_args(int argc, char * argv[]){
 	// CHECK FOR ARGUMENT COUNT >= 6
 	if(argc < 6){
-		printf("Please enter the command as follows:\n");
-		printf("multi-lookup <# requester> <# resolver> <requester log> <resolver log> [ <data file> ...]\n");
+		fprintf(stderr, "Please enter the command as follows:\n");
+		fprintf(stderr, "multi-lookup <# requester> <# resolver> <requester log> <resolver log> [ <data file> ...]\n");
 		return -1;
 	}
 
 	// CHECK LOG FILES ARE DIFFERENT
 	if(strcmp(argv[3], argv[4]) == 0){
-		printf("Error: requester log and resolver log files are the same\n");
+		fprintf(stderr, "Error: requester log and resolver log files are the same\n");
 		return -1;
 	}
 
@@ -400,10 +400,10 @@ int check_args(int argc, char * argv[]){
 int create_pool(int num, pthread_t * arr, void * func, void * params){
 	for(int i = 0; i < num; i++){
 		if(pthread_create(&(arr[i]), NULL, func, params)){
-			printf("create_pool: Failed to create thread %d\n", i);
+			fprintf(stderr, "create_pool: Failed to create thread %d\n", i);
 			return -1;
 		}
-		if(DEBUG_PRINT && DEBUG_PRINT_THREAD) printf("create_pool: Created thread %d TID %lu\n", i, arr[i]);
+		if(DEBUG_PRINT && DEBUG_PRINT_THREAD) fprintf(stderr, "create_pool: Created thread %d TID %lu\n", i, arr[i]);
 	}
 	return 0;
 }
@@ -412,10 +412,10 @@ int create_pool(int num, pthread_t * arr, void * func, void * params){
 int join_pool(int num, pthread_t * arr){
 	for(int i = 0; i < num; i++){
 		if(pthread_join(arr[i], NULL)){
-			printf("join_pool: Failed to join Thread %d TID %lu\n", i, arr[i]);
+			fprintf(stderr, "join_pool: Failed to join Thread %d TID %lu\n", i, arr[i]);
 			return -1;
 		}
-		if(DEBUG_PRINT && DEBUG_PRINT_THREAD) printf("join_pool: Joined thread %d TID %lu\n", i, arr[i]);
+		if(DEBUG_PRINT && DEBUG_PRINT_THREAD) fprintf(stderr, "join_pool: Joined thread %d TID %lu\n", i, arr[i]);
 	}
 	return 0;
 }
@@ -424,12 +424,12 @@ int join_pool(int num, pthread_t * arr){
 int open_log(FILE ** log, char * file_name){
 	// Check if file exists
 	if(access(file_name, F_OK)){
-		printf("Log file %s doesn't exist\n", file_name);
+		fprintf(stderr, "Log file %s doesn't exist\n", file_name);
 		return -1;
 	}
 	(*log) = fopen(file_name, "w"); // Second option "w" clears the file before writing
 	if(log == NULL){
-		printf("Error opening %s\n", file_name);
+		fprintf(stderr, "Error opening %s\n", file_name);
 		return -1;
 	}
 
