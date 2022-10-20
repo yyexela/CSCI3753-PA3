@@ -1,6 +1,6 @@
 # CSCI 3753: Operating Systems, Programming Assignment 3
 
-This repository contains my solution to programming assignment 3 for CSCI 3753: Operating Systems at CU Boulder. The assignment description is located in `PA3.pdf`. The main premise of the assignment is to "develop a multi-threaded application that resolves domain names to IP addresses". This assignment required the use of mutexes as an input file, output file, and shared array were used across multiple threads. Careful attention to detail was needed to avoid deadlock and to clean up allocated memory after the application finished running.
+This repository contains my solution to programming assignment 3 for CSCI 3753: Operating Systems at CU Boulder. The assignment description is located in `PA3.pdf`. The main premise of the assignment is to "develop a multi-threaded application that resolves domain names to IP addresses". This assignment required the use of mutexes as an input file, output file, and shared array were used across multiple threads. Careful attention to detail was needed to avoid deadlock and to clean up allocated memory after the application finished running. The main files are listed below, with my solution being in `multi-lookup.h` and `multi-lookup.c`. All other files are helper files that I used for testing during development.
 
 # Files
 
